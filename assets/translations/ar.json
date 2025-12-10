@@ -1,0 +1,23 @@
+{
+  "app_name": "سيرفي",
+  "customer_app_name": "سيرفي للعملاء",
+  "driver_app_name": "سيرفي للسائقين",
+  "restaurant_app_name": "سيرفي للمطاعم",
+  "login": "تسجيل الدخول",
+  "register": "إنشاء حساب",
+  "logout": "تسجيل الخروج",
+  "email": "البريد الإلكتروني",
+  "password": "كلمة المرور",
+  "phone": "رقم الهاتف",
+  "home": "الرئيسية",
+  "orders": "الطلبات",
+  "profile": "الملف الشخصي",
+  "cart": "السلة",
+  "settings": "الإعدادات",
+  "notifications": "الإشعارات",
+  "skip": "تخطي",
+  "next": "التالي",
+  "get_started": "ابدأ الآن"
+}
+
+

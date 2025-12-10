@@ -1,0 +1,23 @@
+{
+  "app_name": "Servy",
+  "customer_app_name": "Servy Customer",
+  "driver_app_name": "Servy Driver",
+  "restaurant_app_name": "Servy Restaurant",
+  "login": "Login",
+  "register": "Register",
+  "logout": "Logout",
+  "email": "Email",
+  "password": "Password",
+  "phone": "Phone Number",
+  "home": "Home",
+  "orders": "Orders",
+  "profile": "Profile",
+  "cart": "Cart",
+  "settings": "Settings",
+  "notifications": "Notifications",
+  "skip": "Skip",
+  "next": "Next",
+  "get_started": "Get Started"
+}
+
+
