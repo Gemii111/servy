@@ -9,6 +9,7 @@ import 'core/constants/api_constants.dart';
 import 'data/datasources/local_storage_service.dart';
 import 'core/providers/locale_provider.dart';
 import 'core/services/connectivity_service.dart';
+import 'core/services/token_service.dart';
 import 'core/localization/app_localizations_delegate.dart';
 
 void main() async {
@@ -19,6 +20,9 @@ void main() async {
 
   // Initialize Hive local storage
   await LocalStorageService.instance.init();
+
+  // ✅ Initialize TokenService (مطلوب لحفظ Tokens)
+  await TokenService.instance.init();
 
   // Initialize API Service
   ApiService.instance.init(baseUrl: ApiConstants.baseUrl);

@@ -1,15 +1,16 @@
 import '../models/auth_response_model.dart';
 import '../models/user_model.dart';
-import '../services/mock_api_service.dart';
+import '../services/api_service.dart'; // ✅ للـ Register
+import '../services/mock_api_service.dart'; // ⚠️ مؤقت للـ Login و UpdateProfile
+import '../../core/constants/api_constants.dart';
+import '../../core/services/token_service.dart';
+import '../../core/services/error_handler_service.dart';
 
 /// Authentication repository
-/// In production, this would use ApiService instead of MockApiService
+/// Register يستخدم ApiService (الباك اند الحقيقي)
+/// Login و UpdateProfile يستخدمان MockApiService (مؤقتاً)
 class AuthRepository {
-  AuthRepository({
-    MockApiService? mockApiService,
-  }) : _mockApiService = mockApiService ?? MockApiService.instance;
-
-  final MockApiService _mockApiService;
+  final MockApiService _mockApiService = MockApiService.instance; // ⚠️ مؤقت
 
   /// Login user
   Future<AuthResponseModel> login({
@@ -25,7 +26,8 @@ class AuthRepository {
     // });
     // return AuthResponseModel.fromJson(response.data);
 
-    // For now, use mock service
+    // ⚠️ TODO: تحديث login ليستخدم ApiService (مثل register)
+    // حالياً يستخدم MockApiService
     return await _mockApiService.login(
       email: email,
       password: password,
@@ -34,6 +36,10 @@ class AuthRepository {
   }
 
   /// Register new user
+  /// 
+  /// ⚠️ قبل الاستخدام:
+  /// 1. تأكد من تحديث Base URL في ApiConstants
+  /// 2. تأكد من تهيئة ApiService و TokenService في main()
   Future<AuthResponseModel> register({
     required String email,
     required String password,
@@ -41,23 +47,67 @@ class AuthRepository {
     String? name,
     String? phone,
   }) async {
-    // In production, use ApiService:
-    // final response = await ApiService.instance.post('/auth/register', data: {
-    //   'email': email,
-    //   'password': password,
-    //   'userType': userType,
-    //   'name': name,
-    //   'phone': phone,
-    // });
-    // return AuthResponseModel.fromJson(response.data);
+    try {
+      // 1. استدعاء API
+      final response = await ApiService.instance.post(
+        ApiConstants.authRegister, // '/auth/register'
+        data: {
+          'email': email,
+          'password': password,
+          'userType': userType,
+          if (name != null) 'name': name,
+          if (phone != null) 'phone': phone,
+        },
+      );
 
-    return await _mockApiService.register(
-      email: email,
-      password: password,
-      userType: userType,
-      name: name,
-      phone: phone,
-    );
+      // 2. فحص Response
+      final responseData = response.data;
+      
+      // إذا كان Response بهذا التنسيق:
+      // {
+      //   "success": true,
+      //   "data": {
+      //     "user": {...},
+      //     "accessToken": "...",
+      //     "refreshToken": "...",
+      //     "expiresAt": "2024-01-01T00:00:00Z"
+      //   }
+      // }
+      
+      if (responseData['success'] == true) {
+        final data = responseData['data'];
+        
+        // 3. إنشاء AuthResponseModel
+        final authResponse = AuthResponseModel(
+          user: UserModel.fromJson(data['user']),
+          accessToken: data['accessToken'],
+          refreshToken: data['refreshToken'],
+          expiresAt: data['expiresAt'] != null
+              ? DateTime.parse(data['expiresAt'])
+              : DateTime.now().add(const Duration(hours: 24)),
+        );
+        
+        // 4. حفظ Tokens
+        await TokenService.instance.saveAuthData(
+          accessToken: authResponse.accessToken,
+          refreshToken: authResponse.refreshToken,
+          expiresAt: authResponse.expiresAt,
+          userId: authResponse.user.id,
+        );
+        
+        return authResponse;
+      } else {
+        // في حالة Error من الباك اند
+        throw ApiException(
+          message: responseData['error'] ?? 'Registration failed',
+          statusCode: response.statusCode,
+          errorData: responseData,
+        );
+      }
+    } catch (e) {
+      // معالجة الأخطاء
+      throw ErrorHandlerService.instance.handleException(e);
+    }
   }
 
   /// Refresh access token
@@ -88,7 +138,8 @@ class AuthRepository {
     // });
     // return UserModel.fromJson(response.data);
 
-    // For now, use mock service
+    // ⚠️ TODO: تحديث updateProfile ليستخدم ApiService
+    // حالياً يستخدم MockApiService
     return await _mockApiService.updateProfile(
       userId: userId,
       name: name,
