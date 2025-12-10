@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../logic/providers/menu_providers.dart';
@@ -9,10 +8,10 @@ import '../../../../logic/providers/cart_providers.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../widgets/common/empty_state_widget.dart';
-import '../../widgets/common/loading_state_widget.dart';
 import '../../widgets/common/error_state_widget.dart';
 import '../../widgets/common/skeleton_loaders.dart';
 import '../../widgets/common/cart_app_bar_icon.dart';
+import '../../../../data/models/restaurant_model.dart';
 
 /// Menu screen showing restaurant menu
 class MenuScreen extends ConsumerWidget {
@@ -56,34 +55,137 @@ class MenuScreen extends ConsumerWidget {
         backgroundColor: AppColors.surface,
         onRefresh: () async {
           ref.invalidate(menuProvider(restaurantId));
+          ref.invalidate(restaurantByIdProvider(restaurantId));
         },
-        child: menuAsync.when(
-          data: (menu) {
-            if (menu.categories.isEmpty) {
-              return EmptyStateWidget(
-                icon: Icons.restaurant_menu_outlined,
-                title: context.l10n.noMenuItemsAvailable,
-                message: 'No menu items available at this time',
-              );
+        child: restaurantAsync.when(
+          data: (restaurant) {
+            // Check if restaurant is closed
+            if (restaurant != null && !restaurant.isOpen) {
+              return _buildClosedMessage(context);
             }
-            return _buildMenuContent(context, ref, menu);
+            // Restaurant is open, show menu
+            return menuAsync.when(
+              data: (menu) {
+                if (menu.categories.isEmpty) {
+                  return EmptyStateWidget(
+                    icon: Icons.restaurant_menu_outlined,
+                    title: context.l10n.noMenuItemsAvailable,
+                    message: 'No menu items available at this time',
+                  );
+                }
+                return _buildMenuContent(context, ref, menu, restaurant);
+              },
+              loading: () => ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: 5,
+                itemBuilder: (context, index) => const MenuItemSkeleton(),
+              ),
+              error: (error, stack) => ErrorStateWidget(
+                message: context.l10n.failedToLoadMenu,
+                error: error.toString(),
+                showGoBack: true,
+              ),
+            );
           },
-        loading: () => ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: 5,
-          itemBuilder: (context, index) => const MenuItemSkeleton(),
-        ),
-          error: (error, stack) => ErrorStateWidget(
-            message: context.l10n.failedToLoadMenu,
-            error: error.toString(),
-            showGoBack: true,
+          loading: () => ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: 5,
+            itemBuilder: (context, index) => const MenuItemSkeleton(),
+          ),
+          error: (_, __) => menuAsync.when(
+            data: (menu) {
+              if (menu.categories.isEmpty) {
+                return EmptyStateWidget(
+                  icon: Icons.restaurant_menu_outlined,
+                  title: context.l10n.noMenuItemsAvailable,
+                  message: 'No menu items available at this time',
+                );
+              }
+              return _buildMenuContent(context, ref, menu, null);
+            },
+            loading: () => ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: 5,
+              itemBuilder: (context, index) => const MenuItemSkeleton(),
+            ),
+            error: (error, stack) => ErrorStateWidget(
+              message: context.l10n.failedToLoadMenu,
+              error: error.toString(),
+              showGoBack: true,
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildMenuContent(BuildContext context, WidgetRef ref, menu) {
+  Widget _buildClosedMessage(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColors.error.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.restaurant_menu,
+                size: 64,
+                color: AppColors.error,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              context.l10n.restaurantIsClosed,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.error.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: AppColors.error.withOpacity(0.3),
+                  width: 1.5,
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline,
+                    color: AppColors.error,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      context.l10n.restaurantClosedMessage,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuContent(BuildContext context, WidgetRef ref, menu, RestaurantModel? restaurant) {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: menu.categories.length,
@@ -94,14 +196,38 @@ class MenuScreen extends ConsumerWidget {
           category: category,
           restaurantId: restaurantId,
           onItemTap: (item) {
-            _showAddToCartDialog(context, ref, item, restaurantId);
+            if (restaurant != null && !restaurant.isOpen) {
+              // Show closed message if trying to add item when restaurant is closed
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(context.l10n.restaurantClosedMessage),
+                  backgroundColor: AppColors.error,
+                  behavior: SnackBarBehavior.floating,
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+              return;
+            }
+            _showAddToCartDialog(context, ref, item, restaurantId, restaurant);
           },
         );
       },
     );
   }
 
-  void _showAddToCartDialog(BuildContext context, WidgetRef ref, item, String restaurantId) {
+  void _showAddToCartDialog(BuildContext context, WidgetRef ref, item, String restaurantId, restaurant) {
+    // Check if restaurant is closed
+    if (restaurant != null && !restaurant.isOpen) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.restaurantClosedMessage),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(

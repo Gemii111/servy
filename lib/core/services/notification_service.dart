@@ -9,6 +9,7 @@ class NotificationData {
   final Map<String, dynamic>? data;
   final DateTime timestamp;
   final String? imageUrl;
+  final String? type; // 'order', 'driver', 'restaurant', 'general', etc.
 
   NotificationData({
     required this.id,
@@ -17,6 +18,7 @@ class NotificationData {
     this.data,
     DateTime? timestamp,
     this.imageUrl,
+    this.type,
   }) : timestamp = timestamp ?? DateTime.now();
 
   factory NotificationData.fromJson(Map<String, dynamic> json) {
@@ -29,6 +31,7 @@ class NotificationData {
           ? DateTime.parse(json['timestamp'] as String)
           : null,
       imageUrl: json['image_url'] as String?,
+      type: json['type'] as String?,
     );
   }
 
@@ -40,15 +43,34 @@ class NotificationData {
       'data': data,
       'timestamp': timestamp.toIso8601String(),
       'image_url': imageUrl,
+      'type': type,
     };
   }
 }
 
 /// Notification service for handling push notifications
-/// Currently uses Mock implementation. To enable Firebase:
-/// 1. Uncomment firebase_core and firebase_messaging in pubspec.yaml
-/// 2. Initialize Firebase in main.dart
-/// 3. Replace MockNotificationService with FirebaseNotificationService
+/// 
+/// 🔄 للتحويل إلى Firebase:
+/// 1. أضف في pubspec.yaml:
+///    - firebase_core: ^2.24.2
+///    - firebase_messaging: ^14.7.10
+/// 2. قم بإعداد Firebase في Firebase Console
+/// 3. أضف google-services.json (Android) و GoogleService-Info.plist (iOS)
+/// 4. قم بإلغاء التعليق على كود Firebase في هذا الملف
+/// 
+/// 📱 الاستخدام:
+/// ```dart
+/// // Initialize في main()
+/// await NotificationService.instance.initialize();
+/// 
+/// // Subscribe to topics
+/// await NotificationService.instance.subscribeToTopic('customer_updates');
+/// 
+/// // Listen to notifications
+/// NotificationService.instance.notificationStream?.listen((notification) {
+///   // Handle notification
+/// });
+/// ```
 class NotificationService {
   static final NotificationService instance = NotificationService._();
   NotificationService._();
@@ -57,7 +79,7 @@ class NotificationService {
   bool _isInitialized = false;
   String? _fcmToken;
 
-  /// Notification stream
+  /// Notification stream - استمع له في app لتلقي الإشعارات
   Stream<NotificationData>? get notificationStream =>
       _notificationController?.stream;
 
@@ -68,6 +90,7 @@ class NotificationService {
   String? get fcmToken => _fcmToken;
 
   /// Initialize notification service
+  /// يجب استدعاءها في main() بعد Firebase initialization
   Future<void> initialize() async {
     if (_isInitialized) {
       Logger.d('NotificationService', 'Already initialized');
@@ -76,66 +99,146 @@ class NotificationService {
 
     _notificationController = StreamController<NotificationData>.broadcast();
 
-    // In a real app, this would initialize Firebase Messaging
-    // await FirebaseMessaging.instance.requestPermission();
-    // final token = await FirebaseMessaging.instance.getToken();
-    // _fcmToken = token;
+    // ==================== Firebase Implementation (Uncomment when ready) ====================
+    /*
+    // Initialize Firebase Messaging
+    await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+      provisional: false,
+    );
 
-    // Mock FCM token
+    // Get FCM token
+    _fcmToken = await FirebaseMessaging.instance.getToken();
+    Logger.d('NotificationService', 'FCM Token: $_fcmToken');
+
+    // Handle foreground messages (when app is open)
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      Logger.d('NotificationService', 'Foreground notification: ${message.notification?.title}');
+      final notification = NotificationData(
+        id: message.messageId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        title: message.notification?.title ?? '',
+        body: message.notification?.body ?? '',
+        data: message.data,
+        imageUrl: message.notification?.android?.imageUrl,
+        type: message.data['type'],
+      );
+      _notificationController?.add(notification);
+    });
+
+    // Handle notification tap (when app is in background)
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      Logger.d('NotificationService', 'Notification tapped: ${message.notification?.title}');
+      final notification = NotificationData(
+        id: message.messageId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        title: message.notification?.title ?? '',
+        body: message.notification?.body ?? '',
+        data: message.data,
+        type: message.data['type'],
+      );
+      _notificationController?.add(notification);
+    });
+
+    // Handle notification tap (when app is terminated)
+    RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    if (initialMessage != null) {
+      Logger.d('NotificationService', 'Initial notification: ${initialMessage.notification?.title}');
+      final notification = NotificationData(
+        id: initialMessage.messageId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        title: initialMessage.notification?.title ?? '',
+        body: initialMessage.notification?.body ?? '',
+        data: initialMessage.data,
+        type: initialMessage.data['type'],
+      );
+      _notificationController?.add(notification);
+    }
+
+    // Handle token refresh
+    FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
+      _fcmToken = newToken;
+      Logger.d('NotificationService', 'FCM Token refreshed: $newToken');
+      // TODO: Send new token to backend
+    });
+    */
+
+    // ==================== Mock Implementation (Current) ====================
+    // Mock FCM token for development
     _fcmToken = 'mock_fcm_token_${DateTime.now().millisecondsSinceEpoch}';
-
-    // Setup notification handlers
-    // FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-    // FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
-    // FirebaseMessaging.instance.getInitialMessage().then(_handleNotificationTap);
+    Logger.d('NotificationService', 'Mock FCM Token: $_fcmToken');
 
     _isInitialized = true;
     Logger.d('NotificationService', 'Notification service initialized');
   }
 
   /// Request notification permissions
+  /// عادة يتم استدعاؤها تلقائياً في initialize()، لكن يمكن استدعاؤها يدوياً
   Future<bool> requestPermission() async {
-    // In a real app, this would request Firebase Messaging permissions
-    // final status = await FirebaseMessaging.instance.requestPermission();
-    // return status.authorizationStatus == AuthorizationStatus.authorized;
+    // ==================== Firebase Implementation ====================
+    /*
+    final status = await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+      provisional: false,
+    );
+    return status.authorizationStatus == AuthorizationStatus.authorized;
+    */
 
     // Mock: always return true
     Logger.d('NotificationService', 'Notification permission granted (mock)');
     return true;
   }
 
-  /// Subscribe to a topic (e.g., 'driver_orders', 'customer_updates')
+  /// Subscribe to a topic (e.g., 'driver_orders', 'customer_updates', 'restaurant_orders')
+  /// يتم الاشتراك في topics مختلفة حسب نوع المستخدم
+  /// 
+  /// Examples:
+  /// - 'customer_${userId}' - إشعارات خاصة بالعميل
+  /// - 'driver_orders' - طلبات التوصيل المتاحة
+  /// - 'restaurant_${restaurantId}_orders' - طلبات المطعم
   Future<void> subscribeToTopic(String topic) async {
-    // In a real app: await FirebaseMessaging.instance.subscribeToTopic(topic);
+    // ==================== Firebase Implementation ====================
+    // await FirebaseMessaging.instance.subscribeToTopic(topic);
+    
     Logger.d('NotificationService', 'Subscribed to topic: $topic (mock)');
   }
 
   /// Unsubscribe from a topic
   Future<void> unsubscribeFromTopic(String topic) async {
-    // In a real app: await FirebaseMessaging.instance.unsubscribeFromTopic(topic);
+    // ==================== Firebase Implementation ====================
+    // await FirebaseMessaging.instance.unsubscribeFromTopic(topic);
+    
     Logger.d('NotificationService', 'Unsubscribed from topic: $topic (mock)');
   }
 
-  /// Handle foreground notification (when app is open)
-  // In a real app, this would be called by Firebase Messaging
-  // void _handleForegroundMessage(NotificationData notification) {
-  //   Logger.d('NotificationService', 'Foreground notification: ${notification.title}');
-  //   _notificationController?.add(notification);
-  // }
+  /// Register FCM token with backend
+  /// يجب استدعاؤها بعد login لتسجيل token في backend
+  Future<void> registerTokenWithBackend(String userId) async {
+    if (_fcmToken == null) {
+      Logger.e('NotificationService', 'FCM token not available');
+      return;
+    }
 
-  /// Handle notification tap (when user taps notification)
-  // In a real app, this would be called by Firebase Messaging
-  // void _handleNotificationTap(NotificationData? notification) {
-  //   if (notification != null) {
-  //     Logger.d('NotificationService', 'Notification tapped: ${notification.title}');
-  //     _notificationController?.add(notification);
-  //   }
-  // }
+    // TODO: Call backend API to register token
+    // Example:
+    // await ApiService.instance.post(
+    //   ApiConstants.notificationsRegisterToken,
+    //   data: {
+    //     'userId': userId,
+    //     'fcmToken': _fcmToken,
+    //     'platform': Platform.isAndroid ? 'android' : 'ios',
+    //   },
+    // );
+
+    Logger.d('NotificationService', 'FCM token registered with backend (mock)');
+  }
 
   /// Emit a mock notification (for testing/simulation)
   void emitMockNotification(NotificationData notification) {
     if (_notificationController != null && !_notificationController!.isClosed) {
       _notificationController!.add(notification);
+      Logger.d('NotificationService', 'Mock notification emitted: ${notification.title}');
     }
   }
 
@@ -147,4 +250,3 @@ class NotificationService {
     Logger.d('NotificationService', 'Notification service disposed');
   }
 }
-

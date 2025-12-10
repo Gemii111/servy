@@ -658,6 +658,9 @@ class AppLocalizations {
   String get restaurantWillBeActiveSoon =>
       _getString('This restaurant is currently offline. It will be active soon.',
           'المطعم غير نشط حالياً. سيكون نشط قريباً');
+  String get restaurantClosedMessage =>
+      _getString('This restaurant is closed and will not accept orders at this time. We will be back soon.',
+          'هذا المطعم مغلق ولن يستقبل طلبات حالياً. سنعود قريباً');
   String get appearance => _getString('Appearance', 'المظهر');
   String get lightMode => _getString('Light Mode', 'الوضع الفاتح');
   String get darkMode => _getString('Dark Mode', 'الوضع الداكن');
